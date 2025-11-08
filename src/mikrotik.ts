@@ -43,8 +43,7 @@ export class MikroTikClient {
     await this.connect();
     try {
       const paramArray = this.paramsToArray(params);
-      const result = await this.api.write(command, paramArray);
-      return result;
+      return await this.api.write(command, paramArray);
     } finally {
       await this.disconnect();
     }

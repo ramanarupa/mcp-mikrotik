@@ -21,14 +21,14 @@
     "router",
     "configuration"
   ],
-  "author": "",
+  "author": "Rustam Gaifiev <rgaifiev@gmail.com>",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "node-routeros": "^1.6.9"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
+    "@types/node": "^24.10.0",
     "typescript": "^5.3.3"
   }
 }

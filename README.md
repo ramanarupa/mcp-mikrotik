@@ -1,62 +1,62 @@
 # MCP MikroTik Server
 
-MCP сервер для конфигурирования MikroTik RouterOS 7 через Claude Code. Позволяет управлять роутером напрямую из Claude Code, используя RouterOS API.
+MCP server for configuring MikroTik RouterOS 7 through Claude Code. Allows you to manage the router directly from Claude Code using the RouterOS API.
 
-## Возможности
+## Features
 
-- Получение информации о системе и ресурсах
-- Управление сетевыми интерфейсами
-- Настройка IP адресов и маршрутов
-- Конфигурация firewall правил и NAT
-- Управление DHCP сервером и lease
-- Настройка DNS
-- Управление беспроводными интерфейсами
-- Работа с пользователями и скриптами
-- Создание backup и export конфигурации
-- Выполнение произвольных RouterOS команд
+- Get system and resource information
+- Manage network interfaces
+- Configure IP addresses and routes
+- Configure firewall rules and NAT
+- Manage DHCP server and leases
+- Configure DNS
+- Manage wireless interfaces
+- Work with users and scripts
+- Create backups and export configuration
+- Execute arbitrary RouterOS commands
 
-## Требования
+## Requirements
 
-- Node.js 18 или выше
-- MikroTik роутер с RouterOS 7
-- Включенный API на MikroTik (по умолчанию порт 8728)
+- Node.js 18 or higher
+- MikroTik router with RouterOS 7
+- Enabled API on MikroTik (default port 8728)
 
-## Установка
+## Installation
 
 ```bash
 npm install
 npm run build
 ```
 
-## Настройка MikroTik
+## MikroTik Configuration
 
-1. Подключитесь к MikroTik через Winbox или SSH
-2. Убедитесь, что API включен:
+1. Connect to MikroTik via Winbox or SSH
+2. Ensure API is enabled:
    ```
    /ip service print
    ```
-   API должен быть enabled на порту 8728
+   API should be enabled on port 8728
 
-3. Если API выключен, включите его:
+3. If API is disabled, enable it:
    ```
    /ip service enable api
    ```
 
-4. Создайте пользователя для API (рекомендуется):
+4. Create an API user (recommended):
    ```
    /user add name=api-user password=your-password group=full
    ```
 
-## Настройка в Claude Code
+## Claude Code Setup
 
-### Быстрый старт (локальная конфигурация)
+### Quick Start (Local Configuration)
 
-1. Скопируйте пример конфигурации:
+1. Copy the example configuration:
    ```bash
    cp .mcp.json.example .mcp.json
    ```
 
-2. Отредактируйте `.mcp.json` и укажите данные вашего роутера:
+2. Edit `.mcp.json` and specify your router details:
    ```json
    {
      "mcpServers": {
@@ -74,9 +74,9 @@ npm run build
    }
    ```
 
-### Глобальная конфигурация
+### Global Configuration
 
-Альтернативно, добавьте MCP сервер в глобальную конфигурацию Claude Code:
+Alternatively, add the MCP server to Claude Code's global configuration:
 
 **Windows:** `%USERPROFILE%\.claude-code\mcp_settings.json`
 **Linux/macOS:** `~/.claude-code/mcp_settings.json`
@@ -98,81 +98,81 @@ npm run build
 }
 ```
 
-**Подробная инструкция:** См. [SETUP.md](SETUP.md) для детальных инструкций по настройке.
+**Detailed Instructions:** See [SETUP.md](SETUP.md) for detailed setup instructions.
 
-**Параметры:**
-- `MIKROTIK_HOST` - IP адрес вашего MikroTik роутера
-- `MIKROTIK_USER` - имя пользователя для API
-- `MIKROTIK_PASSWORD` - пароль
-- `MIKROTIK_PORT` - порт API (обычно 8728, для SSL - 8729)
+**Parameters:**
+- `MIKROTIK_HOST` - IP address of your MikroTik router
+- `MIKROTIK_USER` - username for API access
+- `MIKROTIK_PASSWORD` - password
+- `MIKROTIK_PORT` - API port (usually 8728, for SSL - 8729)
 
-## Использование
+## Usage
 
-После настройки вы можете использовать MCP сервер в Claude Code. Примеры команд:
+After setup, you can use the MCP server in Claude Code. Example commands:
 
-### Получить информацию о системе
+### Get system information
 ```
-Покажи информацию о системе MikroTik
-```
-
-### Посмотреть интерфейсы
-```
-Покажи все сетевые интерфейсы
+Show MikroTik system information
 ```
 
-### Добавить IP адрес
+### View interfaces
 ```
-Добавь IP адрес 192.168.1.1/24 на интерфейс ether1
-```
-
-### Настроить firewall
-```
-Добавь правило firewall: разрешить SSH (порт 22) из подсети 192.168.88.0/24
+Show all network interfaces
 ```
 
-### Посмотреть DHCP lease
+### Add IP address
 ```
-Покажи все DHCP lease
-```
-
-### Создать backup
-```
-Создай backup конфигурации
+Add IP address 192.168.1.1/24 to interface ether1
 ```
 
-## Доступные инструменты
+### Configure firewall
+```
+Add firewall rule: allow SSH (port 22) from subnet 192.168.88.0/24
+```
 
-- `mikrotik_system_info` - Информация о системе
-- `mikrotik_get_interfaces` - Список интерфейсов
-- `mikrotik_get_ip_addresses` - Список IP адресов
-- `mikrotik_add_ip_address` - Добавить IP адрес
-- `mikrotik_get_firewall_rules` - Список firewall правил
-- `mikrotik_add_firewall_rule` - Добавить firewall правило
-- `mikrotik_get_dhcp_leases` - DHCP lease
-- `mikrotik_execute_command` - Выполнить RouterOS команду
+### View DHCP leases
+```
+Show all DHCP leases
+```
 
-## Безопасность
+### Create backup
+```
+Create configuration backup
+```
 
-- Не храните пароли в открытом виде в конфигурации
-- Используйте отдельного пользователя для API доступа
-- Ограничьте доступ к API по IP адресам:
+## Available Tools
+
+- `mikrotik_system_info` - System information
+- `mikrotik_get_interfaces` - List interfaces
+- `mikrotik_get_ip_addresses` - List IP addresses
+- `mikrotik_add_ip_address` - Add IP address
+- `mikrotik_get_firewall_rules` - List firewall rules
+- `mikrotik_add_firewall_rule` - Add firewall rule
+- `mikrotik_get_dhcp_leases` - DHCP leases
+- `mikrotik_execute_command` - Execute RouterOS command
+
+## Security
+
+- Do not store passwords in plain text in configuration files
+- Use a separate user for API access
+- Restrict API access by IP addresses:
   ```
   /ip service set api address=192.168.88.0/24
   ```
-- Рекомендуется использовать API-SSL (порт 8729) для шифрованного соединения
+- It is recommended to use API-SSL (port 8729) for encrypted connections
 
-## Разработка
+## Development
 
-Запустить в режиме разработки:
+Run in development mode:
 ```bash
 npm run dev
 ```
 
-Собрать проект:
+Build the project:
 ```bash
 npm run build
 ```
 
-## Лицензия
+## License
 
 MIT

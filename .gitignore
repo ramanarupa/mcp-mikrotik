@@ -1,8 +1,38 @@
+# Dependencies
 node_modules/
+
+# Build output
 build/
-*.log
+dist/
+
+# Environment variables
 .env
+.env.local
+
+# MCP configuration (contains passwords)
 .mcp.json
-mcp_settings.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
-*.tsbuildinfo
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+*.txt
+
+# SSH keys
+*.pem
+*.key
+id_rsa*
+/package-lock.json
+/CLAUDE.md
+
+/.claude/
