@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "mikrotik": {
+      "command": "node",
+      "args": ["./build/index.js"],
+      "env": {
+        "MIKROTIK_HOST": "192.168.88.1",
+        "MIKROTIK_USER": "admin",
+        "MIKROTIK_PASSWORD": "your-password-here",
+        "MIKROTIK_PORT": "8728"
+      },
+      "disabled": false
+    }
+  }
+}

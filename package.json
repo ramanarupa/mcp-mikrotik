@@ -1,0 +1,34 @@
+{
+  "name": "mcp-mikrotik",
+  "version": "0.1.0",
+  "description": "MCP server for configuring MikroTik RouterOS 7",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "mcp-mikrotik": "build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "dev": "tsc --watch",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "mikrotik",
+    "routeros",
+    "network",
+    "router",
+    "configuration"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "node-routeros": "^1.6.9"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}
