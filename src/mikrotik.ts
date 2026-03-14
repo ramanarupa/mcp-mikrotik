@@ -1,7 +1,8 @@
 import { RouterOSAPI } from 'node-routeros';
 
+export type RouterOSResponse = Record<string, string>;
+
 export class MikroTikClient {
-  private api: RouterOSAPI;
   private host: string;
   private user: string;
   private password: string;
@@ -12,115 +13,93 @@ export class MikroTikClient {
     this.user = user;
     this.password = password;
     this.port = port;
-    this.api = new RouterOSAPI({
+  }
+
+  private paramsToArray(params?: Record<string, string | number>): string[] {
+    if (!params) return [];
+    return Object.entries(params).map(([key, value]) => `=${key}=${value}`);
+  }
+
+  private async execute(command: string, params?: Record<string, string | number>): Promise<RouterOSResponse[]> {
+    const api = new RouterOSAPI({
       host: this.host,
       user: this.user,
       password: this.password,
       port: this.port,
     });
-  }
-
-  private async connect(): Promise<void> {
-    if (!this.api.connected) {
-      await this.api.connect();
-    }
-  }
-
-  private async disconnect(): Promise<void> {
-    if (this.api.connected) {
-      await this.api.close();
-    }
-  }
-
-  private paramsToArray(params?: Record<string, any>): string[] {
-    if (!params) return [];
-    return Object.entries(params).map(([key, value]) => {
-      return `=${key}=${value}`;
-    });
-  }
-
-  private async execute(command: string, params?: Record<string, any>): Promise<any[]> {
-    await this.connect();
+    await api.connect();
     try {
       const paramArray = this.paramsToArray(params);
-      return await this.api.write(command, paramArray);
+      return await api.write(command, paramArray) as RouterOSResponse[];
     } finally {
-      await this.disconnect();
+      await api.close();
     }
   }
 
   // System information
-  async getSystemInfo(): Promise<any[]> {
+  async getSystemInfo(): Promise<RouterOSResponse[]> {
     return await this.execute('/system/resource/print');
   }
 
-  async getSystemIdentity(): Promise<any[]> {
+  async getSystemIdentity(): Promise<RouterOSResponse[]> {
     return await this.execute('/system/identity/print');
   }
 
-  async setSystemIdentity(name: string): Promise<any[]> {
+  async setSystemIdentity(name: string): Promise<RouterOSResponse[]> {
     return await this.execute('/system/identity/set', { name });
   }
 
   // Interface management
-  async getInterfaces(): Promise<any[]> {
+  async getInterfaces(): Promise<RouterOSResponse[]> {
     return await this.execute('/interface/print');
   }
 
-  async getInterfaceStats(interfaceName?: string): Promise<any[]> {
-    const params = interfaceName ? { interface: interfaceName } : undefined;
-    return await this.execute('/interface/monitor-traffic', params);
-  }
-
-  async enableInterface(interfaceName: string): Promise<any[]> {
+  async enableInterface(interfaceName: string): Promise<RouterOSResponse[]> {
     return await this.execute('/interface/enable', { '.id': interfaceName });
   }
 
-  async disableInterface(interfaceName: string): Promise<any[]> {
+  async disableInterface(interfaceName: string): Promise<RouterOSResponse[]> {
     return await this.execute('/interface/disable', { '.id': interfaceName });
   }
 
   // IP Address management
-  async getIpAddresses(): Promise<any[]> {
+  async getIpAddresses(): Promise<RouterOSResponse[]> {
     return await this.execute('/ip/address/print');
   }
 
-  async addIpAddress(address: string, iface: string, network?: string): Promise<string> {
-    const params: Record<string, any> = {
+  async addIpAddress(address: string, iface: string, network?: string): Promise<RouterOSResponse[]> {
+    const params: Record<string, string> = {
       address,
       interface: iface,
     };
     if (network) {
       params.network = network;
     }
-    await this.execute('/ip/address/add', params);
-    return 'success';
+    return await this.execute('/ip/address/add', params);
   }
 
-  async removeIpAddress(id: string): Promise<string> {
-    await this.execute('/ip/address/remove', { '.id': id });
-    return 'success';
+  async removeIpAddress(id: string): Promise<RouterOSResponse[]> {
+    return await this.execute('/ip/address/remove', { '.id': id });
   }
 
   // IP Route management
-  async getRoutes(): Promise<any[]> {
+  async getRoutes(): Promise<RouterOSResponse[]> {
     return await this.execute('/ip/route/print');
   }
 
-  async addRoute(dstAddress: string, gateway: string, distance?: number): Promise<string> {
-    const params: Record<string, any> = {
+  async addRoute(dstAddress: string, gateway: string, distance?: number): Promise<RouterOSResponse[]> {
+    const params: Record<string, string | number> = {
       'dst-address': dstAddress,
       gateway,
     };
     if (distance !== undefined) {
       params.distance = distance;
     }
-    await this.execute('/ip/route/add', params);
-    return 'success';
+    return await this.execute('/ip/route/add', params);
   }
 
   // Firewall management
-  async getFirewallRules(chain?: string): Promise<any[]> {
+  async getFirewallRules(chain?: string): Promise<RouterOSResponse[]> {
     const params = chain ? { chain } : undefined;
     return await this.execute('/ip/firewall/filter/print', params);
   }
@@ -136,8 +115,8 @@ export class MikroTikClient {
     inInterface?: string;
     outInterface?: string;
     comment?: string;
-  }): Promise<string> {
-    const apiParams: Record<string, any> = {
+  }): Promise<RouterOSResponse[]> {
+    const apiParams: Record<string, string> = {
       chain: params.chain,
       action: params.action,
     };
@@ -151,16 +130,14 @@ export class MikroTikClient {
     if (params.outInterface) apiParams['out-interface'] = params.outInterface;
     if (params.comment) apiParams.comment = params.comment;
 
-    await this.execute('/ip/firewall/filter/add', apiParams);
-    return 'success';
+    return await this.execute('/ip/firewall/filter/add', apiParams);
   }
 
-  async removeFirewallRule(id: string): Promise<string> {
-    await this.execute('/ip/firewall/filter/remove', { '.id': id });
-    return 'success';
+  async removeFirewallRule(id: string): Promise<RouterOSResponse[]> {
+    return await this.execute('/ip/firewall/filter/remove', { '.id': id });
   }
 
-  async getFirewallNat(): Promise<any[]> {
+  async getFirewallNat(): Promise<RouterOSResponse[]> {
     return await this.execute('/ip/firewall/nat/print');
   }
 
@@ -175,8 +152,8 @@ export class MikroTikClient {
     dstPort?: string;
     outInterface?: string;
     comment?: string;
-  }): Promise<string> {
-    const apiParams: Record<string, any> = {
+  }): Promise<RouterOSResponse[]> {
+    const apiParams: Record<string, string> = {
       chain: params.chain,
       action: params.action,
     };
@@ -190,16 +167,15 @@ export class MikroTikClient {
     if (params.outInterface) apiParams['out-interface'] = params.outInterface;
     if (params.comment) apiParams.comment = params.comment;
 
-    await this.execute('/ip/firewall/nat/add', apiParams);
-    return 'success';
+    return await this.execute('/ip/firewall/nat/add', apiParams);
   }
 
   // DHCP Server
-  async getDhcpServers(): Promise<any[]> {
+  async getDhcpServers(): Promise<RouterOSResponse[]> {
     return await this.execute('/ip/dhcp-server/print');
   }
 
-  async getDhcpLeases(): Promise<any[]> {
+  async getDhcpLeases(): Promise<RouterOSResponse[]> {
     return await this.execute('/ip/dhcp-server/lease/print');
   }
 
@@ -208,8 +184,8 @@ export class MikroTikClient {
     macAddress: string;
     server?: string;
     comment?: string;
-  }): Promise<string> {
-    const apiParams: Record<string, any> = {
+  }): Promise<RouterOSResponse[]> {
+    const apiParams: Record<string, string> = {
       address: params.address,
       'mac-address': params.macAddress,
     };
@@ -217,65 +193,61 @@ export class MikroTikClient {
     if (params.server) apiParams.server = params.server;
     if (params.comment) apiParams.comment = params.comment;
 
-    await this.execute('/ip/dhcp-server/lease/add', apiParams);
-    return 'success';
+    return await this.execute('/ip/dhcp-server/lease/add', apiParams);
   }
 
   // DNS
-  async getDnsSettings(): Promise<any[]> {
+  async getDnsSettings(): Promise<RouterOSResponse[]> {
     return await this.execute('/ip/dns/print');
   }
 
-  async setDnsServers(servers: string[]): Promise<string> {
-    await this.execute('/ip/dns/set', { servers: servers.join(',') });
-    return 'success';
+  async setDnsServers(servers: string[]): Promise<RouterOSResponse[]> {
+    return await this.execute('/ip/dns/set', { servers: servers.join(',') });
   }
 
-  async getDnsCache(): Promise<any[]> {
+  async getDnsCache(): Promise<RouterOSResponse[]> {
     return await this.execute('/ip/dns/cache/print');
   }
 
   // Wireless (if available)
-  async getWirelessInterfaces(): Promise<any[]> {
+  async getWirelessInterfaces(): Promise<RouterOSResponse[]> {
     return await this.execute('/interface/wireless/print');
   }
 
-  async getWirelessRegistrationTable(): Promise<any[]> {
+  async getWirelessRegistrationTable(): Promise<RouterOSResponse[]> {
     return await this.execute('/interface/wireless/registration-table/print');
   }
 
   // Users
-  async getUsers(): Promise<any[]> {
+  async getUsers(): Promise<RouterOSResponse[]> {
     return await this.execute('/user/print');
   }
 
-  async addUser(name: string, password: string, group: string = 'full'): Promise<string> {
-    await this.execute('/user/add', { name, password, group });
-    return 'success';
+  async addUser(name: string, password: string, group: string = 'full'): Promise<RouterOSResponse[]> {
+    return await this.execute('/user/add', { name, password, group });
   }
 
   // Scripts
-  async getScripts(): Promise<any[]> {
+  async getScripts(): Promise<RouterOSResponse[]> {
     return await this.execute('/system/script/print');
   }
 
-  async runScript(scriptName: string): Promise<any[]> {
+  async runScript(scriptName: string): Promise<RouterOSResponse[]> {
     return await this.execute('/system/script/run', { '.id': scriptName });
   }
 
   // Generic command execution
-  async executeCommand(command: string, params?: Record<string, any>): Promise<any[]> {
+  async executeCommand(command: string, params?: Record<string, string | number>): Promise<RouterOSResponse[]> {
     return await this.execute(command, params);
   }
 
   // Backup and export
-  async createBackup(name?: string): Promise<string> {
+  async createBackup(name?: string): Promise<RouterOSResponse[]> {
     const params = name ? { name } : undefined;
-    await this.execute('/system/backup/save', params);
-    return 'Backup created successfully';
+    return await this.execute('/system/backup/save', params);
   }
 
-  async exportConfig(): Promise<any[]> {
+  async exportConfig(): Promise<RouterOSResponse[]> {
     return await this.execute('/export');
   }
 }
