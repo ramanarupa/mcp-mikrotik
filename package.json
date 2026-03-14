@@ -24,11 +24,11 @@
   "author": "Rustam Gaifiev <rgaifiev@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "node-routeros": "^1.6.9"
   },
   "devDependencies": {
-    "@types/node": "^24.10.0",
+    "@types/node": "^25.5.0",
     "typescript": "^5.3.3"
   }
 }
