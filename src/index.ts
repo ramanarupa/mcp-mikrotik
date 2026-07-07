@@ -31,6 +31,17 @@ if (portRaw && portRaw.length > 0) {
   MIKROTIK_PORT = parsed;
 }
 
+const timeoutRaw = process.env.MIKROTIK_TIMEOUT;
+let MIKROTIK_TIMEOUT: number | undefined;
+if (timeoutRaw && timeoutRaw.length > 0) {
+  const parsed = Number(timeoutRaw);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 600) {
+    console.error(`Error: MIKROTIK_TIMEOUT must be an integer in 1..600 (seconds), got "${timeoutRaw}"`);
+    process.exit(1);
+  }
+  MIKROTIK_TIMEOUT = parsed;
+}
+
 if (!MIKROTIK_HOST) {
   console.error('Error: MIKROTIK_HOST environment variable is required');
   process.exit(1);
@@ -47,6 +58,7 @@ const mikrotikClient = new MikroTikClient({
   port: MIKROTIK_PORT,
   tls: MIKROTIK_TLS,
   rejectUnauthorized: MIKROTIK_TLS_REJECT_UNAUTHORIZED,
+  timeout: MIKROTIK_TIMEOUT,
 });
 
 // ---- Result helpers ----
@@ -94,6 +106,15 @@ function optionalNumber(args: Record<string, unknown>, key: string): number | un
   if (v === undefined || v === null) return undefined;
   if (typeof v !== 'number' || !Number.isFinite(v)) {
     throw new Error(`Parameter "${key}" must be a finite number`);
+  }
+  return v;
+}
+
+function optionalBoolean(args: Record<string, unknown>, key: string): boolean | undefined {
+  const v = args[key];
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== 'boolean') {
+    throw new Error(`Parameter "${key}" must be a boolean`);
   }
   return v;
 }
@@ -395,6 +416,34 @@ const tools: Tool[] = [
     description: 'Export the full router configuration',
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
+  // Logs
+  {
+    name: 'mikrotik_search_logs',
+    description:
+      'Search the RouterOS system log (/log/print). Filter by "message" (case-insensitive substring, or a regex when regex=true) and/or by "topics" (comma-separated; an entry matches if its topics contain ANY given value as a substring, e.g. "wireguard" or "dhcp,error"). Returns matched entries newest-first, up to "limit" (default 100). With no filters, returns the most recent entries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          description: 'Match the log message: case-insensitive substring, or a regex when regex=true',
+        },
+        topics: {
+          type: 'string',
+          description: 'Comma-separated topics to match (substring, case-insensitive), e.g. "wireguard" or "dhcp,error"',
+        },
+        regex: {
+          type: 'boolean',
+          description: 'Treat "message" as a case-insensitive regular expression (default false)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Max entries to return, newest-first (default 100)',
+        },
+      },
+      required: [],
+    },
+  },
   // Generic
   {
     name: 'mikrotik_execute_command',
@@ -566,6 +615,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'mikrotik_export_config':
         return jsonResult(await mikrotikClient.exportConfig());
 
+      // Logs
+      case 'mikrotik_search_logs':
+        return jsonResult(
+          await mikrotikClient.searchLogs({
+            message: optionalString(args, 'message'),
+            topics: optionalString(args, 'topics'),
+            regex: optionalBoolean(args, 'regex'),
+            limit: optionalNumber(args, 'limit'),
+          }),
+        );
+
       // Generic
       case 'mikrotik_execute_command':
         return jsonResult(
@@ -603,7 +663,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    `MikroTik MCP server running on stdio (host=${MIKROTIK_HOST}, tls=${MIKROTIK_TLS}, destructive=${MIKROTIK_ALLOW_DESTRUCTIVE})`,
+    `MikroTik MCP server running on stdio (host=${MIKROTIK_HOST}, tls=${MIKROTIK_TLS}, destructive=${MIKROTIK_ALLOW_DESTRUCTIVE}, timeout=${MIKROTIK_TIMEOUT ?? 30}s)`,
   );
 }
 

@@ -149,6 +149,7 @@ Create configuration backup
 - `mikrotik_get_firewall_rules` - List firewall rules
 - `mikrotik_add_firewall_rule` - Add firewall rule
 - `mikrotik_get_dhcp_leases` - DHCP leases
+- `mikrotik_search_logs` - Search the system log (`/log/print`) by message (substring or regex) and/or topics, newest-first
 - `mikrotik_execute_command` - Execute RouterOS command
 
 ## Security

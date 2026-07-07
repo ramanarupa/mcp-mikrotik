@@ -36,7 +36,7 @@ export class MikroTikClient {
       port: opts.port ?? (opts.tls ? 8729 : 8728),
       tls: opts.tls ?? false,
       rejectUnauthorized: opts.rejectUnauthorized ?? false,
-      timeout: opts.timeout ?? 10,
+      timeout: opts.timeout ?? 30,
     };
   }
 
@@ -185,6 +185,65 @@ export class MikroTikClient {
 
   async setSystemIdentity(name: string): Promise<RouterOSResponse[]> {
     return this.execute('/system/identity/set', { name });
+  }
+
+  // ---- Logs ----
+  /**
+   * Search the RouterOS system log (`/log/print`). Fetches the log buffer and
+   * filters client-side (RouterOS API can't do `where`/substring queries):
+   *  - `topics`: comma-separated; an entry matches if its topics contain ANY
+   *    of the given values (case-insensitive substring).
+   *  - `message`: case-insensitive substring, or a regex when `regex` is true.
+   * Returns matched entries newest-first, capped at `limit` (default 100),
+   * each as `{ time, topics, message }`.
+   */
+  async searchLogs(opts: {
+    message?: string;
+    topics?: string;
+    regex?: boolean;
+    limit?: number;
+  }): Promise<RouterOSResponse[]> {
+    let out = (await this.execute('/log/print')) as Array<Record<string, unknown>>;
+
+    if (opts.topics) {
+      const wanted = opts.topics
+        .split(',')
+        .map((t) => t.trim().toLowerCase())
+        .filter((t) => t.length > 0);
+      if (wanted.length > 0) {
+        out = out.filter((r) => {
+          const topics = String(r.topics ?? '').toLowerCase();
+          return wanted.some((w) => topics.includes(w));
+        });
+      }
+    }
+
+    if (opts.message && opts.message.length > 0) {
+      if (opts.regex) {
+        let re: RegExp;
+        try {
+          re = new RegExp(opts.message, 'i');
+        } catch (err) {
+          throw new Error(
+            `Invalid regex in "message": ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        out = out.filter((r) => re.test(String(r.message ?? '')));
+      } else {
+        const needle = opts.message.toLowerCase();
+        out = out.filter((r) => String(r.message ?? '').toLowerCase().includes(needle));
+      }
+    }
+
+    // `/log/print` returns oldest-first; present newest-first.
+    out = out.slice().reverse();
+
+    const limit = opts.limit && opts.limit > 0 ? Math.floor(opts.limit) : 100;
+    return out.slice(0, limit).map((r) => ({
+      time: r.time,
+      topics: r.topics,
+      message: r.message,
+    }));
   }
 
   // ---- Interfaces ----
