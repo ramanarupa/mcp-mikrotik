@@ -61,6 +61,34 @@ const mikrotikClient = new MikroTikClient({
   timeout: MIKROTIK_TIMEOUT,
 });
 
+// ---- Diagnostic markers ----
+// Every marker goes to stderr; stdout is reserved for the MCP JSON-RPC stream.
+// (Claude Code captures MCP server stderr in its logs.)
+export const MARKER = '[MCP-MARKER]';
+export function marker(...parts: unknown[]): void {
+  console.error(MARKER, ...parts);
+}
+
+// node-routeros throws SYNCHRONOUSLY from inside the socket 'data' callback:
+//   Channel.onUnknown()      -> RosException 'UNKNOWNREPLY'
+//   Receiver.sendTagData()   -> RosException 'UNREGISTEREDTAG'
+// Those throws are outside any promise, so execute()'s try/catch cannot see
+// them. Without these handlers Node prints the stack and EXITS the process,
+// which the MCP client reports as "Connection closed". We log the culprit
+// (which throw + which command, correlate with the execute >> marker) and keep
+// the process alive, dropping the now-orphaned RouterOS connection so the next
+// tool call reconnects cleanly.
+process.on('uncaughtException', (err) => {
+  marker('uncaughtException:', err instanceof Error ? (err.stack ?? err.message) : String(err));
+  void mikrotikClient.close().catch(() => {});
+});
+process.on('unhandledRejection', (reason) => {
+  marker(
+    'unhandledRejection:',
+    reason instanceof Error ? (reason.stack ?? reason.message) : String(reason),
+  );
+});
+
 // ---- Result helpers ----
 function jsonResult(data: unknown) {
   return {

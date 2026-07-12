@@ -1,4 +1,52 @@
 import { RouterOSAPI } from 'node-routeros';
+import { createRequire } from 'node:module';
+
+// ---- Runtime patch for node-routeros v1.6.9 crash bugs ----
+// The library throws SYNCHRONOUSLY from inside the socket 'data' callback in
+// two spots. Those throws are outside any promise, so they surface as an
+// uncaughtException and kill the whole process — the MCP client then reports
+// "Connection closed" (reproducible on /routing/rule/print, environment/print,
+// and other large/streamed replies while a keepalive '#' channel is in flight).
+//   - Receiver.sendTagData(): throws 'UNREGISTEREDTAG' when a late/duplicate
+//     sentence arrives for a tag whose channel already closed. The real channel
+//     already resolved, so the stray data is safe to DROP.
+//   - Channel.onUnknown(): throws 'UNKNOWNREPLY' on an unrecognized reply word.
+//     Non-fatal — LOG and move on.
+// This patch must run before any RouterOSAPI/Channel is constructed (it does:
+// module load time), so Channel's constructor binds the patched onUnknown.
+(() => {
+  try {
+    const req = createRequire(import.meta.url);
+    const { Receiver } = req('node-routeros/dist/connector/Receiver.js');
+    const { Channel } = req('node-routeros/dist/Channel.js');
+    Receiver.prototype.sendTagData = function (this: any, currentTag: string): void {
+      const tag = this.tags.get(currentTag);
+      if (tag) {
+        tag.callback(this.currentPacket);
+      } else {
+        console.error('[MCP-MARKER] node-routeros: dropped data on unregistered tag', currentTag);
+      }
+      this.cleanUp();
+    };
+    Channel.prototype.onUnknown = function (this: any, reply: string): void {
+      // RouterOS returns the reply word '!empty' for some empty print results
+      // (e.g. /routing/rule/print with 0 rows). node-routeros only knows
+      // !re/!done/!trap and lands here. The stock method throws 'UNKNOWNREPLY';
+      // even with the throw suppressed the channel would close WITHOUT ever
+      // emitting 'done', so the write promise hangs until the timeout. Resolve
+      // it with whatever data accumulated (for '!empty' that is []), which is
+      // the correct result and lets the command return normally.
+      console.error('[MCP-MARKER] node-routeros: resolving write on unknown reply', reply);
+      this.emit('done', this.data);
+    };
+    console.error('[MCP-MARKER] node-routeros crash patch applied');
+  } catch (e) {
+    console.error(
+      '[MCP-MARKER] node-routeros crash patch FAILED (server may still crash):',
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+})();
 
 export type RouterOSResponse = Record<string, unknown>;
 
@@ -113,19 +161,67 @@ export class MikroTikClient {
     params?: Record<string, string | number>,
   ): Promise<RouterOSResponse[]> {
     const paramArray = this.paramsToArray(params);
+    // Marker to stderr — correlate with an uncaughtException/unhandledRejection
+    // marker to see which command was in flight when node-routeros threw from
+    // inside the socket 'data' callback (Channel.onUnknown / Receiver.sendTagData).
+    console.error('[MCP-MARKER] execute >>', command, paramArray.length ? JSON.stringify(paramArray) : '');
     let api: RouterOSAPI;
     try {
       api = await this.getConnection();
-      return (await api.write(command, paramArray)) as RouterOSResponse[];
+      const rows = await this.writeWithTimeout(api, command, paramArray);
+      console.error('[MCP-MARKER] execute <<', command, `rows=${rows.length}`);
+      return rows;
     } catch (err) {
+      console.error('[MCP-MARKER] execute !!', command, err instanceof Error ? err.message : String(err));
       // Single retry on stale-connection class of errors.
       if (this.isConnectionError(err)) {
+        console.error('[MCP-MARKER] execute retry', command);
         this.api = null;
         api = await this.getConnection();
-        return (await api.write(command, paramArray)) as RouterOSResponse[];
+        return this.writeWithTimeout(api, command, paramArray);
       }
       throw err;
     }
+  }
+
+  /**
+   * Wrap api.write() with a hard timeout. The library's channel promise can
+   * hang forever if a reply is never delivered (e.g. after a suppressed
+   * unknown reply, or a dropped stray tag). On timeout we drop the cached
+   * connection so the next call reconnects cleanly, and reject so the tool
+   * returns an error instead of the request hanging until the MCP client
+   * gives up (which the user sees as "Connection closed").
+   */
+  private writeWithTimeout(
+    api: RouterOSAPI,
+    command: string,
+    paramArray: string[],
+  ): Promise<RouterOSResponse[]> {
+    const ms = (this.options.timeout + 5) * 1000;
+    return new Promise<RouterOSResponse[]>((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        console.error('[MCP-MARKER] execute TIMEOUT', command, `${ms}ms`);
+        if (this.api === api) this.api = null; // force reconnect next call
+        reject(new Error(`RouterOS write timed out after ${ms}ms (connection reset)`));
+      }, ms);
+      api.write(command, paramArray).then(
+        (rows) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(rows as RouterOSResponse[]);
+        },
+        (err) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          reject(err);
+        },
+      );
+    });
   }
 
   private isConnectionError(err: unknown): boolean {
